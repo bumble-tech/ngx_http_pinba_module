@@ -259,7 +259,7 @@ static char *ngx_http_pinba_ignore_codes(ngx_conf_t *cf, ngx_command_t *cmd, voi
 			code2_len = value[i].len - code1_len;
 
 			if (code1_len < 3 || code2_len < 3) {
-				ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] invalid status code value \"%V\"", &value[i]);
+				ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] invalid status code value \"%V\", values must not be less than 100 or greater than 599", &value[i]);
 				return NGX_CONF_ERROR;
 			}
 
@@ -299,13 +299,11 @@ static char *ngx_http_pinba_ignore_codes(ngx_conf_t *cf, ngx_command_t *cmd, voi
 				}
 				*pcode = (ngx_uint_t)n;
 			}
-
-
 		} else {
 			/* just a simple value */
 			code = ngx_atoi(value[i].data, value[i].len);
 			if (code < 100 || code > 599) {
-				ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] invalid status code value \"%V\"", &value[i]);
+				ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] invalid status code value \"%V\", values must not be less than 100 or greater than 599", &value[i]);
 				return NGX_CONF_ERROR;
 			}
 

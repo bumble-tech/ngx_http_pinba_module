@@ -4,7 +4,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: vars
+=== TEST 1: sanity
 --- http_config
     pinba_enable on;
 --- config
@@ -14,3 +14,4 @@ __DATA__
 --- request
     GET /foo
 --- error_code: 418
+--- no_error_log: [error]
