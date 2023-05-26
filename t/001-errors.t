@@ -21,3 +21,27 @@ __DATA__
 --- must_die
 --- error_log
 [pinba] invalid status code value "666"
+
+=== TEST 3: pinba_timer - negative value
+--- config
+    location /foo {
+        pinba_timer -1.0 1 {
+            bar "baz";
+        }
+        return 418;
+    }
+--- must_die
+--- error_log
+[pinba] timer value must be greater than zero
+
+=== TEST 4: pinba_timer - negative hit count
+--- config
+    location /foo {
+        pinba_timer 1.0 -1 {
+            bar "baz";
+        }
+        return 418;
+    }
+--- must_die
+--- error_log
+[pinba] timer hit count must be greater than zero

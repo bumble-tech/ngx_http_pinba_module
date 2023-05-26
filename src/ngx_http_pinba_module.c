@@ -67,7 +67,7 @@ typedef struct {
 
 typedef struct {
 	double        value;
-	unsigned int  hit_count;
+	ngx_int_t     hit_count;
 	ngx_array_t  *tags;
 	unsigned int  tag_cnt;
 	ngx_http_complex_value_t *value_cv;
