@@ -16,11 +16,11 @@ __DATA__
 
 === TEST 2: pinba_server - unknown server
 --- http_config
-    pinba_server "example.tld:30002";
+    pinba_server "example.tld:33333";
 --- config
 --- must_die
 --- error_log
-[pinba] getaddrinfo("example.tld:30002") failed
+[pinba] getaddrinfo("example.tld:33333") failed
 
 === TEST 3: pinba_ignore_codes - short code
 --- http_config

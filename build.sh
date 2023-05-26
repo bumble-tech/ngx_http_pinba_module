@@ -17,7 +17,7 @@ fi
 
 cd ${DIR}/build/nginx
 
-./configure --prefix=${DIR}/build/install --add-module=${DIR}
+./configure --prefix=${DIR}/build/install --add-module=${DIR} --with-debug
 
 make
 

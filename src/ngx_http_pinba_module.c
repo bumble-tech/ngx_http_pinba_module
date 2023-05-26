@@ -828,31 +828,6 @@ static void ngx_http_pinba_send_data(ngx_http_request_t *r, ngx_pinba_socket_t *
 }
 /* }}} */
 
-#if 0
-static int ngx_http_pinba_push_into_buffer(ngx_http_pinba_loc_conf_t *lcf, ngx_http_request_t *r, Pinba__Request *request, int packed_size) /* {{{ */
-{
-	if (lcf->buffer_size != NGX_CONF_UNSET_SIZE && lcf->buffer_size > 0) {
-		if (lcf->request == NULL) {
-			lcf->request = request;
-		} else if ((lcf->request_size + packed_size) > lcf->buffer_size) {
-			ngx_http_pinba_send_data(lcf, r, lcf->request, 0);
-			pinba__request__free_unpacked(lcf->request, NULL);
-			lcf->request = request;
-		} else {
-			lcf->request->requests = realloc(lcf->request->requests, sizeof(Pinba__Request *) * (lcf->request->n_requests + 1));
-			if (lcf->request->requests) {
-				lcf->request->requests[lcf->request->n_requests] = request;
-				lcf->request->n_requests++;
-				lcf->request_size += packed_size;
-			}
-		}
-		return 0;
-	}
-	return -1;
-}
-/* }}} */
-#endif
-
 static inline int ngx_pinba_add_word(ngx_pinba_word_t **words, char *index_str, int index_str_len, unsigned int *word_id) /* {{{ */
 {
 	ngx_pinba_word_t *word;
@@ -973,6 +948,8 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 			request->hostname = strdup(g_hostname);
 		}
 
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request hostname: %s", request->hostname);
+
 		memcpy(server_name, r->headers_in.server.data, (r->headers_in.server.len > PINBA_STR_BUFFER_SIZE) ? PINBA_STR_BUFFER_SIZE : r->headers_in.server.len);
 		request->server_name = strdup(server_name);
 
@@ -996,7 +973,10 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 			}
 			memcpy(script_name, r->unparsed_uri.data, (uri_len > PINBA_STR_BUFFER_SIZE) ? PINBA_STR_BUFFER_SIZE : uri_len);
 		}
+
 		request->script_name = strdup(script_name);
+
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request script_name: %s", request->script_name);
 
 		request_schema = ngx_http_get_variable(r, &request_schema_name, request_schema_key);
 
@@ -1015,6 +995,8 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 #endif
 				request->schema = strdup("http");
 		}
+
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request schema: %s", request->schema);
 
 		request->document_size = r->connection->sent;
 
