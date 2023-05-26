@@ -6,7 +6,23 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: pinba_ignore_codes - short code
+=== TEST 1: pinba_server - no port
+--- http_config
+    pinba_server "example.tld";
+--- config
+--- must_die
+--- error_log
+[pinba] no port in pinba server "example.tld"
+
+=== TEST 2: pinba_server - unknown server
+--- http_config
+    pinba_server "example.tld:30002";
+--- config
+--- must_die
+--- error_log
+[pinba] getaddrinfo("example.tld:30002") failed
+
+=== TEST 3: pinba_ignore_codes - short code
 --- http_config
     pinba_ignore_codes 33;
 --- config
@@ -14,7 +30,7 @@ __DATA__
 --- error_log
 [pinba] invalid status code value "33"
 
-=== TEST 2: pinba_ignore_codes - unknown code
+=== TEST 4: pinba_ignore_codes - unknown code
 --- http_config
     pinba_ignore_codes 666;
 --- config
@@ -22,25 +38,23 @@ __DATA__
 --- error_log
 [pinba] invalid status code value "666"
 
-=== TEST 3: pinba_timer - negative value
+=== TEST 5: pinba_timer - negative value
 --- config
     location /foo {
         pinba_timer -1.0 1 {
             bar "baz";
         }
-        return 418;
     }
 --- must_die
 --- error_log
 [pinba] timer value must be greater than zero
 
-=== TEST 4: pinba_timer - negative hit count
+=== TEST 6: pinba_timer - negative hit count
 --- config
     location /foo {
         pinba_timer 1.0 -1 {
             bar "baz";
         }
-        return 418;
     }
 --- must_die
 --- error_log

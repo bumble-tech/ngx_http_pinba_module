@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 use Test::Nginx::Socket 'no_plan';
 
 run_tests();
@@ -9,9 +11,9 @@ __DATA__
     pinba_enable on;
 --- config
     location /foo {
-        return 418;
+        return 200;
     }
 --- request
     GET /foo
---- error_code: 418
+--- error_code: 200
 --- no_error_log: [error]
