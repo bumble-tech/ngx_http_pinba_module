@@ -1,12 +1,27 @@
 ngx_addon_name=ngx_http_pinba_module
 
+HTTP_PINBA_MODULE_SRCS="                                   \
+                $ngx_addon_dir/src/ngx_http_pinba_module.c \
+                $ngx_addon_dir/src/pinba.pb-c.c            \
+                $ngx_addon_dir/src/protobuf-c.c            \
+                "
+
+HTTP_PINBA_MODULE_DEPS="                                \
+                $ngx_addon_dir/src/pinba.pb-c.h         \
+                $ngx_addon_dir/src/protobuf-c.h         \
+                $ngx_addon_dir/src/protobuf-c-private.h \
+                $ngx_addon_dir/src/uthash.h             \
+                "
+
 if test -n "$ngx_module_link"; then
      ngx_module_type=HTTP
-     ngx_module_name=ngx_http_pinba_module
-     ngx_module_srcs="$ngx_addon_dir/ngx_http_pinba_module.c $ngx_addon_dir/pinba.pb-c.c $ngx_addon_dir/protobuf-c.c"
+     ngx_module_name=$ngx_addon_name
+     ngx_module_srcs="$HTTP_PINBA_MODULE_SRCS"
+     ngx_module_deps="$HTTP_PINBA_MODULE_DEPS"
  
      . auto/module
 else
-     HTTP_MODULES="$HTTP_MODULES ngx_http_pinba_module"
-     NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_pinba_module.c $ngx_addon_dir/pinba.pb-c.c $ngx_addon_dir/protobuf-c.c"
+     HTTP_MODULES="$HTTP_MODULES $ngx_addon_name"
+     NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_PINBA_MODULE_SRCS"
+     NGX_ADDON_DEPS="$NGX_ADDON_DEPS $HTTP_PINBA_MODULE_DEPS"
 fi
