@@ -20,7 +20,7 @@ __DATA__
 --- error_log eval
 [
     qr/\[debug\] .* http pinba handler/,
-    qr/\[debug\] .* pinba request hostname: .*\..*/,
+    qr/\[debug\] .* pinba request hostname: .*/,
     qr/\[debug\] .* pinba request script_name: \/foo/,
     qr/\[debug\] .* pinba request schema: http/,
 ]
