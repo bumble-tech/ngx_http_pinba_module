@@ -24,6 +24,12 @@ Add this to your Nginx configure line:
 
 and then do `make install`.
 
+Development and testing
+-----------------------
+
+For development purposes you can use `build.sh` script.
+To run tests you can use `test.sh` script.
+
 Configuration options
 ---------------------
 All configuration options must be added to the `http {}` section of the config file,
