@@ -6,7 +6,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: basic functionality
+=== basic: use default values
 --- http_config
     pinba_enable on;
     pinba_server "127.0.0.1:33333";
@@ -25,7 +25,7 @@ __DATA__
     qr/\[debug\] .* pinba request schema: http/,
 ]
 
-=== TEST 2: set pinba variables
+=== basic: use pinba variables
 --- http_config
     pinba_enable on;
     pinba_server "127.0.0.1:33333";

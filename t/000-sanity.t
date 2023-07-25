@@ -6,7 +6,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: sanity
+=== sanity
 --- http_config
     pinba_enable on;
 --- config

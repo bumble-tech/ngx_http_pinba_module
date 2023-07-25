@@ -26,12 +26,14 @@ ngx_int_t request_schema_key;
 ngx_int_t hostname_key;
 
 typedef struct {
+	/* no variables support for tag names */
 	char name[PINBA_WORD_SIZE];
 	int name_len;
-	ngx_http_complex_value_t *name_cv;
+	/* variables support for tag values */
 	char value[PINBA_WORD_SIZE];
 	int value_len;
 	ngx_http_complex_value_t *value_cv;
+	/* hashtable */
 	UT_hash_handle hh;
 } ngx_pinba_tag_t;
 
@@ -329,27 +331,10 @@ static char *ngx_pinba_parse_tag_str(ngx_conf_t *cf, ngx_pinba_tag_t *tag, ngx_s
 	tag->name[0] = '\0';
 	tag->value[0] = '\0';
 
-	ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
-	ccv.cf = cf;
-	ccv.value = name;
-	ccv.complex_value = &cv;
+	/* no variables support for tag names */
+	memcpy_static(tag->name, name->data, name->len, tag->name_len);
 
-	if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
-		return NGX_CONF_ERROR;
-	}
-
-	if (cv.lengths == NULL) {
-		memcpy_static(tag->name, name->data, name->len, tag->name_len);
-		tag->name_cv = NULL;
-	} else {
-		tag->name_cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
-		if (tag->name_cv == NULL) {
-			return NGX_CONF_ERROR;
-		}
-
-		*tag->name_cv = cv;
-	}
-
+	/* variables support for tag values */
 	ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 	ccv.cf = cf;
 	ccv.value = value;
@@ -380,16 +365,11 @@ static ngx_pinba_tag_t *ngx_pinba_prepare_tag(ngx_http_request_t *r, ngx_pinba_t
 	ngx_str_t v;
 	ngx_pinba_tag_t *prepared_tag, tmp_tag;
 
-	if (tag->name_cv) {
-		if (ngx_http_complex_value(r, tag->name_cv, &v) != NGX_OK) {
-			return NULL;
-		}
-		memcpy_static(tmp_tag.name, v.data, v.len, tmp_tag.name_len);
-	} else {
-		memcpy(tmp_tag.name, tag->name, sizeof(tag->name));
-		tmp_tag.name_len = tag->name_len;
-	}
+	/* no variables support for tag names */
+	memcpy(tmp_tag.name, tag->name, sizeof(tag->name));
+	tmp_tag.name_len = tag->name_len;
 
+	/* variables support for tag values */
 	if (tag->value_cv) {
 		if (ngx_http_complex_value(r, tag->value_cv, &v) != NGX_OK) {
 			return NULL;
@@ -404,6 +384,7 @@ static ngx_pinba_tag_t *ngx_pinba_prepare_tag(ngx_http_request_t *r, ngx_pinba_t
 	if (!prepared_tags) {
 		return NULL;
 	}
+
 	*prepared_tag = tmp_tag;
 	return prepared_tag;
 }
@@ -461,6 +442,11 @@ static char *ngx_http_pinba_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
 	tag_name = value[1];
 	tag_value = value[2];
 
+	if (tag_name.data[0] == '$') {
+		ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] request tag name cannot be variable");
+		return NGX_CONF_ERROR;
+	}
+
 	if (lcf->tags == NULL) {
 		lcf->tags = ngx_array_create(cf->pool, 4, sizeof(ngx_pinba_tag_t));
 		if (lcf->tags == NULL) {
@@ -479,6 +465,7 @@ static char *ngx_http_pinba_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) 
 		ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to parse pinba_tag value");
 		return NGX_CONF_ERROR;
 	}
+
 	return NGX_CONF_OK;
 }
 /* }}} */
@@ -496,6 +483,11 @@ static char *ngx_http_pinba_timer_handler(ngx_conf_t *cf, ngx_command_t *dummy, 
 	tag_name = value[0];
 	tag_value = value[1];
 
+	if (tag_name.data[0] == '$') {
+		ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] timer tag name cannot be variable");
+		return NGX_CONF_ERROR;
+	}
+
 	timer->tag_cnt++;
 
 	tag = ngx_array_push(timer->tags);
@@ -507,6 +499,7 @@ static char *ngx_http_pinba_timer_handler(ngx_conf_t *cf, ngx_command_t *dummy, 
 	if (ngx_pinba_parse_tag_str(ctx->cf, tag, &tag_name, &tag_value) != NGX_CONF_OK) {
 		return NGX_CONF_ERROR;
 	}
+
 	return NGX_CONF_OK;
 }
 /* }}} */
