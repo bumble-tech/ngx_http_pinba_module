@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests for simple directives functionality
 - Debug logs that are useful for both tests and debugging
 
+### Changed
+
+- Disallow using variables in request/timer tags names
+
 ## [1.0.0] - 2023-05-26
 
 Basic version of this module that works for years in Bumble.
