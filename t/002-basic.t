@@ -54,6 +54,26 @@ __DATA__
     qr/\[debug\] .* \[pinba\] request schema: some_schema/,
 ]
 
+=== basic: pinba_server override
+--- http_config
+    pinba_enable on;
+    pinba_server "127.0.0.1:33333";
+    pinba_resolve_freq 0;
+--- config
+    location /foo {
+        pinba_server "127.0.0.1:44444";
+        return 200;
+    }
+--- request
+    GET /foo
+--- error_code: 200
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] server 127.0.0.1:44444 re-resolve after 0 sec/,
+]
+
+
 === basic: pinba_resolve_freq override
 --- user_files
 >>> ../conf/test.js
@@ -82,4 +102,39 @@ export default {respond_with_delay};
     qr/\[debug\] .* \[pinba\] request script_name: \/foo/,
     qr/\[debug\] .* \[pinba\] request schema: http/,
     qr/\[debug\] .* \[pinba\] server 127.0.0.1:33333 re-resolve after 10 sec/,
+]
+
+=== basic: pinba_ignore_codes simple
+--- http_config
+    pinba_enable on;
+    pinba_ignore_codes 200;
+--- config
+    location /foo {
+        return 200;
+    }
+--- request
+    GET /foo
+--- error_code: 200
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] ignoring response code 200/,
+]
+
+=== basic: pinba_ignore_codes override
+--- http_config
+    pinba_enable on;
+    pinba_ignore_codes 200;
+--- config
+    location /foo {
+        pinba_ignore_codes 404;
+        return 404;
+    }
+--- request
+    GET /foo
+--- error_code: 404
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] ignoring response code 404/,
 ]

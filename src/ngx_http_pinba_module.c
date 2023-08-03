@@ -876,6 +876,7 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 		for (i = 0; i < lcf->ignore_codes->nelts; i++) {
 			if (status == pcode[i]) {
 				/* this status is ignored, so just get outta here */
+				ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] ignoring response code %d", status);
 				return NGX_OK;
 			}
 		}
@@ -1236,6 +1237,22 @@ static void _ngx_array_copy(ngx_pool_t *pool, ngx_array_t *src, ngx_array_t **ds
 }
 /* }}} */
 
+static int _ngx_conf_array_replace(ngx_pool_t *pool, ngx_array_t *prev_array, ngx_array_t **conf_array) /* {{{ */
+{
+	if (!*conf_array && prev_array) {
+		*conf_array = ngx_array_create(pool, prev_array->nelts, prev_array->size);
+		if (!*conf_array) {
+			return -1;
+		}
+
+		memcpy((*conf_array)->elts, prev_array->elts, prev_array->nelts * prev_array->size);
+		(*conf_array)->nelts = prev_array->nelts;
+	}
+
+	return 0;
+}
+/* }}} */
+
 static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) /* {{{ */
 {
 	ngx_http_pinba_loc_conf_t *prev = parent;
@@ -1243,14 +1260,14 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 
 	ngx_conf_merge_value(conf->enable, prev->enable, 0);
 
-	if (prev->servers) {
-		_ngx_array_copy(cf->pool, prev->servers, &conf->servers);
+	if (_ngx_conf_array_replace(cf->pool, prev->servers, &conf->servers) < 0) {
+		return NGX_CONF_ERROR;
 	}
 
 	ngx_conf_merge_sec_value(conf->resolve_freq, prev->resolve_freq, 60);
 
-	if (prev->ignore_codes) {
-		_ngx_array_copy(cf->pool, prev->ignore_codes, &conf->ignore_codes);
+	if (_ngx_conf_array_replace(cf->pool, prev->ignore_codes, &conf->ignore_codes) < 0) {
+		return NGX_CONF_ERROR;
 	}
 
 	if (prev->tags) {
