@@ -15,9 +15,17 @@ if [[ ! -d ${DIR}/build/nginx ]]; then
     mv ${DIR}/build/nginx-${NGINX_VERSION} ${DIR}/build/nginx
 fi
 
+if [[ ! -d ${DIR}/build/njs ]]; then
+    git clone https://github.com/nginx/njs.git ${DIR}/build/njs
+fi
+
 cd ${DIR}/build/nginx
 
-./configure --prefix=${DIR}/build/install --add-module=${DIR} --with-debug
+NJS_OPENSSL=NO ./configure \
+    --prefix=${DIR}/build/install \
+    --add-module=${DIR} \
+    --add-module=${DIR}/build/njs/nginx \
+    --with-debug
 
 make
 

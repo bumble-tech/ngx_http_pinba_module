@@ -59,8 +59,8 @@ typedef struct {
 } ngx_pinba_hash_sock_t;
 
 typedef struct {
-	ngx_flag_t   enable;
-	ngx_array_t *ignore_codes;
+	ngx_flag_t      enable;
+	ngx_array_t    *ignore_codes;
 	ngx_array_t    *servers;
 	ngx_array_t    *tags;
 	ngx_array_t    *timers;
@@ -80,7 +80,7 @@ typedef struct {
 	struct rusage start;
 } ngx_pinba_request_ctx_t;
 
-#define TIMER_INITIALIZER { 0.0, 0, NULL, 0, NULL, NULL}
+#define TIMER_INITIALIZER { 0.0, 0, NULL, 0, NULL, NULL }
 
 typedef struct {
 	ngx_pinba_timer_t *timer;
@@ -95,7 +95,6 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 static ngx_int_t ngx_http_pinba_init(ngx_conf_t *cf);
 static char *ngx_http_pinba_ignore_codes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_pinba_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static char *ngx_http_pinba_buffer_size(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_pinba_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_pinba_timer_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
@@ -145,6 +144,13 @@ static ngx_command_t  ngx_http_pinba_commands[] = { /* {{{ */
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_pinba_loc_conf_t, enable),
+      NULL },
+
+    { ngx_string("pinba_server"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_1MORE,
+      ngx_http_pinba_server,
+      NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
@@ -152,7 +158,7 @@ static ngx_command_t  ngx_http_pinba_commands[] = { /* {{{ */
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_sec_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      0,
+      offsetof(ngx_http_pinba_loc_conf_t, resolve_freq),
       NULL },
 
     { ngx_string("pinba_ignore_codes"),
@@ -165,20 +171,6 @@ static ngx_command_t  ngx_http_pinba_commands[] = { /* {{{ */
     { ngx_string("pinba_tag"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE2,
       ngx_http_pinba_tag,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      0,
-      NULL },
-
-    { ngx_string("pinba_buffer_size"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_1MORE,
-      ngx_http_pinba_buffer_size,
-      NGX_HTTP_LOC_CONF_OFFSET,
-	  0,
-      NULL },
-
-    { ngx_string("pinba_server"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_SIF_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_1MORE,
-      ngx_http_pinba_server,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -619,32 +611,6 @@ static char *ngx_http_pinba_timer_block(ngx_conf_t *cf, ngx_command_t *cmd, void
 }
 /* }}} */
 
-static char *ngx_http_pinba_buffer_size(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) /* {{{ */
-{
-#if 0 /* UNUSED for now */
-	ngx_http_pinba_loc_conf_t *lcf = conf;
-	ngx_str_t *value;
-	size_t size;
-
-	value = cf->args->elts;
-
-	size = ngx_parse_size(&value[1]);
-	if (size == (size_t) NGX_ERROR) {
-		ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] invalid buffer size \"%V\" (only values from 0 to 65507 are accepted)", &value[1]);
-		return NGX_CONF_ERROR;
-	}
-
-	if (size > 65507) {
-		ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] buffer size value \"%V\" is too big (only values from 0 to 65507 are accepted)", &value[1]);
-		return NGX_CONF_ERROR;
-	}
-
-	lcf->buffer_size = size;
-#endif
-	return NGX_CONF_OK;
-}
-/* }}} */
-
 static int ngx_http_pinba_resolve_and_open_socket(ngx_http_request_t *r, ngx_conf_t *cf, ngx_str_t *host, ngx_str_t *port, int resolve_freq, ngx_pinba_socket_t **sock) /* {{{ */
 {
 	char tmp_key[PINBA_SERVER_SIZE + PINBA_PORT_SIZE + 1];
@@ -680,11 +646,43 @@ static int ngx_http_pinba_resolve_and_open_socket(ngx_http_request_t *r, ngx_con
 		memcpy_static_nl(element->server_name, host->data, host->len);
 		memcpy_static_nl(element->port, port->data, port->len);
 		HASH_ADD_STR(g_sock_hash, key, element);
+
+		if (cf) {
+    #   if (NGX_DEBUG)
+			ngx_conf_log_error(
+				NGX_LOG_DEBUG, cf, 0,
+				"[pinba] server %s:%s first resolve",
+				element->server_name, element->port
+			);
+    # endif
+		} else {
+			ngx_log_debug2(
+				NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+				"[pinba] server %s:%s first resolve",
+				element->server_name, element->port
+			);
+		}
 	} else {
 		*sock = &element->sock;
 
 		if (ngx_time() < (element->sock.last_resolve_time + resolve_freq)) {
 			return (element->sock.fd < 0) ? -1 : 0;
+		}
+
+		if (cf) {
+#if (NGX_DEBUG)
+			ngx_conf_log_error(
+				NGX_LOG_DEBUG, cf, 0,
+				"[pinba] server %s:%s re-resolve after %d sec",
+				element->server_name, element->port, resolve_freq
+			);
+#endif
+		} else {
+			ngx_log_debug3(
+				NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+				"[pinba] server %s:%s re-resolve after %d sec",
+				element->server_name, element->port, resolve_freq
+			);
 		}
 
 		if (element->sock.fd >= 0) {
@@ -855,7 +853,7 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 	ngx_pinba_request_ctx_t *ctx;
 	ngx_array_t *socks = NULL;
 
-	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "http pinba handler");
+	ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] http handler");
 
 	lcf = ngx_http_get_module_loc_conf(r, ngx_http_pinba_module);
 
@@ -941,7 +939,7 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 			request->hostname = strdup(g_hostname);
 		}
 
-		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request hostname: %s", request->hostname);
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] request hostname: %s", request->hostname);
 
 		memcpy(server_name, r->headers_in.server.data, (r->headers_in.server.len > PINBA_STR_BUFFER_SIZE) ? PINBA_STR_BUFFER_SIZE : r->headers_in.server.len);
 		request->server_name = strdup(server_name);
@@ -969,7 +967,7 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 
 		request->script_name = strdup(script_name);
 
-		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request script_name: %s", request->script_name);
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] request script_name: %s", request->script_name);
 
 		request_schema = ngx_http_get_variable(r, &request_schema_name, request_schema_key);
 
@@ -989,7 +987,7 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 				request->schema = strdup("http");
 		}
 
-		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "pinba request schema: %s", request->schema);
+		ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] request schema: %s", request->schema);
 
 		request->document_size = r->connection->sent;
 
@@ -1218,10 +1216,10 @@ static void *ngx_http_pinba_create_loc_conf(ngx_conf_t *cf) /* {{{ */
 
 	conf->enable = NGX_CONF_UNSET;
 	conf->servers = NULL;
+	conf->resolve_freq = NGX_CONF_UNSET;
 	conf->ignore_codes = NULL;
 	conf->tags = NULL;
 	conf->timers = NULL;
-	conf->resolve_freq = NGX_CONF_UNSET;
 
 	return conf;
 }
@@ -1245,6 +1243,12 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 
 	ngx_conf_merge_value(conf->enable, prev->enable, 0);
 
+	if (prev->servers) {
+		_ngx_array_copy(cf->pool, prev->servers, &conf->servers);
+	}
+
+	ngx_conf_merge_sec_value(conf->resolve_freq, prev->resolve_freq, 60);
+
 	if (prev->ignore_codes) {
 		_ngx_array_copy(cf->pool, prev->ignore_codes, &conf->ignore_codes);
 	}
@@ -1256,12 +1260,6 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 	if (prev->timers) {
 		_ngx_array_copy(cf->pool, prev->timers, &conf->timers);
 	}
-
-	if (prev->servers) {
-		_ngx_array_copy(cf->pool, prev->servers, &conf->servers);
-	}
-
-	ngx_conf_merge_sec_value(conf->resolve_freq, prev->resolve_freq, 60);
 
 	return NGX_CONF_OK;
 }
