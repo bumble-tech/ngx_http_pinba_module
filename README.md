@@ -44,6 +44,7 @@ You can add several of these separated by space. In that case the same data will
 
 `pinba_resolve_freq` - integer (seconds).
 Resolve frequency for pinba server hostname. The module will try to re-resolve the hostname each N seconds to make sure it's up-to-date.
+Zero (0) means immediate re-resolve.
 Default value: 60 seconds.
 
 `pinba_ignore_codes` - a list of HTTP status codes.  

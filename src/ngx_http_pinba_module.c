@@ -1226,18 +1226,18 @@ static void *ngx_http_pinba_create_loc_conf(ngx_conf_t *cf) /* {{{ */
 }
 /* }}} */
 
-static void _ngx_array_copy(ngx_pool_t *pool, ngx_array_t *src, ngx_array_t **dst) /* {{{ */
+static void _ngx_array_copy(ngx_pool_t *pool, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
 {
-	*dst = ngx_array_create(pool, src->nelts, src->size);
-	if (!*dst) {
+	*conf_array = ngx_array_create(pool, prev_array->nelts, prev_array->size);
+	if (!*conf_array) {
 		return;
 	}
-	memcpy((*dst)->elts, src->elts, src->nelts * src->size);
-	(*dst)->nelts = src->nelts;
+	memcpy((*conf_array)->elts, prev_array->elts, prev_array->nelts * prev_array->size);
+	(*conf_array)->nelts = prev_array->nelts;
 }
 /* }}} */
 
-static int _ngx_conf_array_replace(ngx_pool_t *pool, ngx_array_t *prev_array, ngx_array_t **conf_array) /* {{{ */
+static int _ngx_conf_array_replace(ngx_pool_t *pool, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
 {
 	if (!*conf_array && prev_array) {
 		*conf_array = ngx_array_create(pool, prev_array->nelts, prev_array->size);
@@ -1260,22 +1260,22 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 
 	ngx_conf_merge_value(conf->enable, prev->enable, 0);
 
-	if (_ngx_conf_array_replace(cf->pool, prev->servers, &conf->servers) < 0) {
+	if (_ngx_conf_array_replace(cf->pool, &conf->servers, prev->servers) < 0) {
 		return NGX_CONF_ERROR;
 	}
 
 	ngx_conf_merge_sec_value(conf->resolve_freq, prev->resolve_freq, 60);
 
-	if (_ngx_conf_array_replace(cf->pool, prev->ignore_codes, &conf->ignore_codes) < 0) {
+	if (_ngx_conf_array_replace(cf->pool, &conf->ignore_codes, prev->ignore_codes) < 0) {
 		return NGX_CONF_ERROR;
 	}
 
 	if (prev->tags) {
-		_ngx_array_copy(cf->pool, prev->tags, &conf->tags);
+		_ngx_array_copy(cf->pool, &conf->tags, prev->tags);
 	}
 
 	if (prev->timers) {
-		_ngx_array_copy(cf->pool, prev->timers, &conf->timers);
+		_ngx_array_copy(cf->pool, &conf->timers, prev->timers);
 	}
 
 	return NGX_CONF_OK;
