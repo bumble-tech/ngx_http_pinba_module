@@ -19,10 +19,10 @@ __DATA__
 --- error_code: 200
 --- error_log eval
 [
-    qr/\[debug\] .* http pinba handler/,
-    qr/\[debug\] .* pinba request hostname: .*/,
-    qr/\[debug\] .* pinba request script_name: \/foo/,
-    qr/\[debug\] .* pinba request schema: http/,
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] request hostname: .*/,
+    qr/\[debug\] .* \[pinba\] request script_name: \/foo/,
+    qr/\[debug\] .* \[pinba\] request schema: http/,
 ]
 
 === basic: use pinba variables
@@ -48,9 +48,62 @@ __DATA__
     X-Pinba-Request-Schema: some_schema
 --- error_log eval
 [
-    qr/\[debug\] .* http pinba handler/,
-    qr/\[debug\] .* pinba request hostname: some.hostname/,
-    qr/\[debug\] .* pinba request script_name: \/some_request_uri/,
-    qr/\[debug\] .* pinba request schema: some_schema/,
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] request hostname: some.hostname/,
+    qr/\[debug\] .* \[pinba\] request script_name: \/some_request_uri/,
+    qr/\[debug\] .* \[pinba\] request schema: some_schema/,
 ]
 
+=== basic: pinba_server override
+--- http_config
+    pinba_enable on;
+    pinba_server "127.0.0.1:33333";
+    pinba_resolve_freq 0;
+--- config
+    location /foo {
+        pinba_server "127.0.0.1:44444";
+        return 200;
+    }
+--- request
+    GET /foo
+--- error_code: 200
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] server 127.0.0.1:44444 re-resolve after 0 sec/,
+]
+
+=== basic: pinba_ignore_codes simple
+--- http_config
+    pinba_enable on;
+    pinba_ignore_codes 200;
+--- config
+    location /foo {
+        return 200;
+    }
+--- request
+    GET /foo
+--- error_code: 200
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] ignoring response code 200/,
+]
+
+=== basic: pinba_ignore_codes override
+--- http_config
+    pinba_enable on;
+    pinba_ignore_codes 200;
+--- config
+    location /foo {
+        pinba_ignore_codes 404;
+        return 404;
+    }
+--- request
+    GET /foo
+--- error_code: 404
+--- error_log eval
+[
+    qr/\[debug\] .* \[pinba\] http handler/,
+    qr/\[debug\] .* \[pinba\] ignoring response code 404/,
+]
