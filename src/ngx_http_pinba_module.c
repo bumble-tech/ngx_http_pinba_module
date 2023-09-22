@@ -1130,8 +1130,11 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 				if (!prepared_tag) {
 					continue;
 				}
+
 				ngx_pinba_add_word(&words, prepared_tag->name, prepared_tag->name_len, &word_id);
 				ngx_pinba_add_word(&words, prepared_tag->value, prepared_tag->value_len, &word_id);
+
+				ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] request tag: %s = %s", prepared_tag->name, prepared_tag->value);
 			}
 
 			n = HASH_COUNT(words);
@@ -1253,6 +1256,58 @@ static int _ngx_conf_array_replace(ngx_pool_t *pool, ngx_array_t **conf_array, n
 }
 /* }}} */
 
+static int _ngx_conf_tags_merge(ngx_conf_t *cf, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
+{
+	if (!*conf_array && prev_array) {
+		*conf_array = ngx_array_create(cf->pool, prev_array->nelts, prev_array->size);
+		if (!*conf_array) {
+			ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate tags array (out of mem?)");
+			return -1;
+		}
+
+		memcpy((*conf_array)->elts, prev_array->elts, prev_array->nelts * prev_array->size);
+		(*conf_array)->nelts = prev_array->nelts;
+	} else if (*conf_array && prev_array) {
+		ngx_pinba_tag_t *prev_elts = prev_array->elts;
+		ngx_pinba_tag_t *conf_elts = (*conf_array)->elts;
+
+		ngx_uint_t i_prev, i_conf;
+		for (i_prev = 0; i_prev < prev_array->nelts; i_prev++) {
+			int found = 0;
+			for (i_conf = 0; i_conf < (*conf_array)->nelts; i_conf++) {
+				if (strcmp(prev_elts[i_prev].name, conf_elts[i_conf].name) == 0) {
+					found = 1;
+					break;
+				}
+			}
+			if (!found) {
+				ngx_pinba_tag_t *tag = ngx_array_push(*conf_array);
+				if (!tag) {
+					ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate tag array item (out of mem?)");
+					return -1;
+				}
+
+				memcpy(tag->name, prev_elts[i_prev].name, PINBA_WORD_SIZE);
+				tag->name_len = prev_elts[i_prev].name_len;
+
+				memcpy(tag->value, prev_elts[i_prev].value, PINBA_WORD_SIZE);
+				tag->value_len = prev_elts[i_prev].value_len;
+				if (prev_elts[i_prev].value_cv) {
+					tag->value_cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+					if (!tag->value_cv) {
+						ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate tag array item complex value (out of mem?)");
+						return -1;
+					}
+
+					*tag->value_cv = *prev_elts[i_prev].value_cv;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) /* {{{ */
 {
 	ngx_http_pinba_loc_conf_t *prev = parent;
@@ -1270,8 +1325,8 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 		return NGX_CONF_ERROR;
 	}
 
-	if (prev->tags) {
-		_ngx_array_copy(cf->pool, &conf->tags, prev->tags);
+	if (_ngx_conf_tags_merge(cf, &conf->tags, prev->tags) < 0) {
+		return NGX_CONF_ERROR;
 	}
 
 	if (prev->timers) {
