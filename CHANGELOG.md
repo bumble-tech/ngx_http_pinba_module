@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix servers and ignore_codes configs override
+- Fix request tags configs merging
 
 ### Changed
 
