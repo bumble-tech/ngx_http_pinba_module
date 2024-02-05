@@ -648,13 +648,13 @@ static int ngx_http_pinba_resolve_and_open_socket(ngx_http_request_t *r, ngx_con
 		HASH_ADD_STR(g_sock_hash, key, element);
 
 		if (cf) {
-    #   if (NGX_DEBUG)
+#if (NGX_DEBUG)
 			ngx_conf_log_error(
 				NGX_LOG_DEBUG, cf, 0,
 				"[pinba] server %s:%s first resolve",
 				element->server_name, element->port
 			);
-    # endif
+#endif
 		} else {
 			ngx_log_debug2(
 				NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -1034,6 +1034,8 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 				tags = timer->tags->elts;
 				timer->tag_cnt = 0;
 
+				ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] timer #%d value and hit count: %2.3f, %d", i, timer->value, timer->hit_count);
+
 				for (j = 0; j < timer->tags->nelts; j++) {
 					ngx_pinba_tag_t *prepared_tag, *tag = &tags[j];
 
@@ -1044,6 +1046,8 @@ static ngx_int_t ngx_http_pinba_handler(ngx_http_request_t *r) /* {{{ */
 					ngx_pinba_add_word(&words, prepared_tag->name, prepared_tag->name_len, &word_id);
 					ngx_pinba_add_word(&words, prepared_tag->value, prepared_tag->value_len, &word_id);
 					prepared_timer->tag_cnt++;
+
+					ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "[pinba] timer #%d tag: %s = %s", i, prepared_tag->name, prepared_tag->value);
 				}
 
 				if (!prepared_timer->tag_cnt) {
@@ -1229,17 +1233,6 @@ static void *ngx_http_pinba_create_loc_conf(ngx_conf_t *cf) /* {{{ */
 }
 /* }}} */
 
-static void _ngx_array_copy(ngx_pool_t *pool, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
-{
-	*conf_array = ngx_array_create(pool, prev_array->nelts, prev_array->size);
-	if (!*conf_array) {
-		return;
-	}
-	memcpy((*conf_array)->elts, prev_array->elts, prev_array->nelts * prev_array->size);
-	(*conf_array)->nelts = prev_array->nelts;
-}
-/* }}} */
-
 static int _ngx_conf_array_replace(ngx_pool_t *pool, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
 {
 	if (!*conf_array && prev_array) {
@@ -1308,6 +1301,86 @@ static int _ngx_conf_tags_merge(ngx_conf_t *cf, ngx_array_t **conf_array, ngx_ar
 	return 0;
 }
 
+static int _ngx_conf_timers_merge(ngx_conf_t *cf, ngx_array_t **conf_array, ngx_array_t *prev_array) /* {{{ */
+{
+	if (!*conf_array && prev_array) {
+		*conf_array = ngx_array_create(cf->pool, prev_array->nelts, prev_array->size);
+		if (!*conf_array) {
+			ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timers array (out of mem?)");
+			return -1;
+		}
+
+		memcpy((*conf_array)->elts, prev_array->elts, prev_array->nelts * prev_array->size);
+		(*conf_array)->nelts = prev_array->nelts;
+	} else if (*conf_array && prev_array) {
+		ngx_pinba_timer_t *prev_elts = prev_array->elts;
+
+		ngx_uint_t i_prev, i_prev_tag;
+		for (i_prev = 0; i_prev < prev_array->nelts; i_prev++) {
+            ngx_pinba_timer_t *timer = ngx_array_push(*conf_array);
+            if (!timer) {
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer array item (out of mem?)");
+                return -1;
+            }
+
+            timer->value = prev_elts[i_prev].value;
+            if (prev_elts[i_prev].value_cv) {
+                timer->value_cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+                if (!timer->value_cv) {
+                    ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer value complex value (out of mem?)");
+                    return -1;
+                }
+                *timer->value_cv = *prev_elts[i_prev].value_cv;
+            }
+
+            timer->hit_count = prev_elts[i_prev].hit_count;
+            if (prev_elts[i_prev].hit_count_cv) {
+                timer->hit_count_cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+                if (!timer->hit_count_cv) {
+                    ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer hit_count complex value (out of mem?)");
+                    return -1;
+                }
+                *timer->hit_count_cv = *prev_elts[i_prev].hit_count_cv;
+            }
+
+            timer->tags = ngx_array_create(cf->pool, prev_elts[i_prev].tags->nelts, prev_elts[i_prev].tags->size);
+            if (!timer->tags) {
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer tags array (out of mem?)");
+                return -1;
+            }
+
+            ngx_pinba_tag_t *prev_elt_tags = prev_elts[i_prev].tags->elts;
+
+            for (i_prev_tag = 0; i_prev_tag < prev_elts[i_prev].tag_cnt; i_prev_tag++) {
+                timer->tag_cnt++;
+
+                ngx_pinba_tag_t *tag = ngx_array_push(timer->tags);
+                if (!tag) {
+                    ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer tag array item (out of mem?)");
+                    return -1;
+                }
+
+                memcpy(tag->name, prev_elt_tags[i_prev_tag].name, PINBA_WORD_SIZE);
+                tag->name_len = prev_elt_tags[i_prev_tag].name_len;
+
+                memcpy(tag->value, prev_elt_tags[i_prev_tag].value, PINBA_WORD_SIZE);
+                tag->value_len = prev_elt_tags[i_prev_tag].value_len;
+                if (prev_elt_tags[i_prev_tag].value_cv) {
+                    tag->value_cv = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+                    if (!tag->value_cv) {
+                        ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "[pinba] failed to allocate timer tag array item complex value (out of mem?)");
+                        return -1;
+                    }
+
+                    *tag->value_cv = *prev_elt_tags[i_prev_tag].value_cv;
+                }
+            }
+		}
+	}
+
+	return 0;
+}
+
 static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) /* {{{ */
 {
 	ngx_http_pinba_loc_conf_t *prev = parent;
@@ -1329,8 +1402,8 @@ static char *ngx_http_pinba_merge_loc_conf(ngx_conf_t *cf, void *parent, void *c
 		return NGX_CONF_ERROR;
 	}
 
-	if (prev->timers) {
-		_ngx_array_copy(cf->pool, &conf->timers, prev->timers);
+	if (_ngx_conf_timers_merge(cf, &conf->timers, prev->timers) < 0) {
+		return NGX_CONF_ERROR;
 	}
 
 	return NGX_CONF_OK;

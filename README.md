@@ -91,15 +91,15 @@ Nginx, of course, doesn't have access to your code and cannot measure it automat
 To do this, use the following syntax:
 
 	pinba_timer 1.25 3 {
-		server $hostname;
 		group db;
+		server $hostname;
 	}
 
-This will create new timer with a value = 1.25 sec, hit count = 3, and 3 tags: server, group with the appropriate values.
-Variables are allowed for all parameters:
+This will create new timer with a value = 1.25 sec, hit count = 3, and 2 tags (server, group) with the appropriate values.
+Variables are allowed for all parameters except tag name:
 
 	pinba_timer $timer_value {
-		$tag $value;
+		name $tag_value;
 	}
 
 Hit count is optional and set to 1 by default.
